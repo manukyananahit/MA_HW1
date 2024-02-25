@@ -1,0 +1,171 @@
+---
+title: "Homework 1 | Bass Model"
+author: "Anahit Manukyan"
+date: "2024-02-22"
+output: pdf_document
+---
+
+# 1/2.Smartphone 
+
+As an innovation I chose a smartphone (Nokia G22). The smartphone is a big invention that everyone knows about. It does a lot more than old phones. You can talk to people, look things up on the internet, use different programs, and do lots of other cool stuff. It's way better and does more than the cellphones. Smartphones help us find places without getting lost, take pictures without a camera, and keep track of our day. I chose it because it changed how we live. It makes things easy and keeps us connected with friends and the world, all in our pockets.
+
+## 3.Cellphone
+
+A look-alike innovation from the past that reminds us of smartphones is the usual cellphone. Before smartphones, regular cell phones were a big deal. They let us talk to each other and send messages, even when we were not at home or near. This was really cool because it meant we could keep in touch with our friends and family all the time, no matter where we were.
+
+I think regular cellphones are like an early version of smartphones because they started the whole idea of carrying a phone with you everywhere. They showed us how handy it is to be able to talk to someone or send a message without needing a computer or a phone attached to a wall. Even though they couldn't do as many things as smartphones can now, regular cellphones were the first step in making phones an important part of our lives. They made it easier for people to stay connected, just like smartphones do today, but in a simpler way.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(knitr)
+library(readxl)
+library(ggplot2)
+library(ggpubr)
+library(diffusion)
+```
+
+
+```{r}
+nokia <- read_excel("nokia1.xlsx")
+nokia
+```
+
+
+```{r}
+sm_sales = ggplot(data = nokia, aes(x = year, y = sales)) +
+  geom_bar(stat = 'Identity', fill = 'darkblue') +
+  ggtitle('Nokia Sales')
+
+sm_sales
+```
+#4. Bass Model
+
+Define functions for f (t) and F(t):
+
+```{r}
+bass.f <- function(t,p,q){
+((p+q)^2/p)*exp(-(p+q)*t)/
+(1+(q/p)*exp(-(p+q)*t))^2
+}
+
+bass.F <- function(t,p,q){
+(1-exp(-(p+q)*t))/
+(1+(q/p)*exp(-(p+q)*t))
+}
+```
+
+```{r}
+cum_ad = ggplot(data = nokia, aes(x = year, y = sales)) +
+stat_function(fun = bass.F, args = c(p=0.002, q=0.21), size = 1) +
+labs(title = 'Nokia Net Sales - Cumulative Adoptions')
+
+time_ad = ggplot(data = nokia, aes(x = year, y = sales)) +
+stat_function(fun = bass.f, args = c(p=0.002, q=0.21), size = 1) +
+labs(title = 'Nokia Net Sales - Adoptions at time t')
+
+suppressWarnings({ggarrange(cum_ad, time_ad, sm_sales)})
+```
+
+
+
+```{r}
+cum_ad = ggplot(data = nokia, aes(x = year, y = sales)) +
+stat_function(fun = bass.F, args = c(p=0.01, q=0.41)) +
+labs(title = 'Nokia Net Sales - Cumulative Adoptions')
+
+time_ad = ggplot(data = nokia, aes(x = year, y = sales)) +
+stat_function(fun = bass.f, args = c(p=0.01, q=0.41)) +
+labs(title = 'Nokia Net Sales - Adoptions At Time t')
+
+
+suppressWarnings({ggarrange(cum_ad, time_ad)})
+```
+#5. Diffusion
+
+The "diffusion" library is an option for estimating the parameters of the bass model.The parameters are used in the Bass model equation to estimate the cumulative number of adopters (net sales in this case) over time.
+
+
+```{r}
+diff_m = diffusion(nokia$sales)
+p=round(diff_m$w,4)[1]
+q=round(diff_m$w,4)[2]
+m=round(diff_m$w,4)[3]
+diff_m
+```
+
+```{r}
+
+sales = nokia$sales
+t = 1:length(sales)
+bass_m = nls(sales ~ m*(((p+q)**2/p)*exp(-(p+q)*t))/
+               (1+(q/p)*exp(-(p+q)*t))**2,
+             start=c(list(m=sum(sales),p=0.02,q=0.4)),control=nls.control(maxiter = 100, minFactor = 1/1024, printEval = TRUE, warnOnly = TRUE))
+
+bass_m
+
+```
+
+A bass model was estimated using the given sales information.The gap between the product's estimated and actual sales is shown in the visualization below. We can see that it is not very good, it is just generalizing.
+
+```{r}
+
+nokia$pred_sales = bass.f(1:10, p = 3.825e-03, q = 7.929e-02) * 4.602e+03
+ggplot(data = nokia, aes(x = year, y = sales)) +
+  geom_bar(stat = 'identity') +
+  geom_point(mapping = aes(x=year, y=pred_sales), color = 'green')
+
+```
+
+Predicting based on our results of bass model.
+
+```{r}
+
+innov_predict <- bass.f(1:50, p = 3.825e-03, q = 7.929e-02) * 4.602e+03
+years <- seq(from = 2009, to = 2008 + 50, by = 1)
+innov_data <- data.frame(Year = years, Sales = innov_predict)
+
+```
+
+
+```{r}
+
+ggplot(data = innov_data, aes(x = Year, y = Sales)) +
+  geom_bar(stat='Identity', fill = 'skyblue') + ylab("Sales (In million $)")
+
+```
+
+
+```{r}
+
+nokia_new <- read_excel("nokia2.xlsx")
+ggplot(data = nokia_new, aes(x = year, y = sales)) +
+  geom_bar(stat = 'Identity', fill = 'steelblue') +
+  ggtitle('Nokia Sales')
+
+```
+
+Explanation: The real sales data for Nokia shows that our predictions didn't match what actually happened. Starting in 2007, new companies with fresh ideas came into the market, causing Nokia to lose its leading position. This means our estimates were off because we didn't account for the impact these new competitors would have on Nokia's sales.
+
+
+6) Estimate the number of adopters by period. Thus, you will need to estimate the potential market share. You can use Fermi’s logic here as well.
+
+1 - Population Estimate: 7 billion (the starting point)
+2 - Adoption Rate: Lets assume that every year starting from 2007 the percentage of smartphone users worldwide increases by 8% yearly.
+3 - Adopters: 8% is 560 million people. 
+Adopters: In the first year, 8% of 7 billion is indeed 560 million. In the second year, you would take the number of smartphone users from the first year and increase it by 8%, and so on for each subsequent year.
+
+For example, if we start with 560 million in 2007 and increase by 8% yearly in a compounding manner, the calculation for the second year would be: 
+Adopters in 2008 = Adopters in 2007 × (1+ 8/100) 
+Adopters in 2008 = 560 million × 1.08 = 604.8 million 
+This method assumes the adoption rate applies to the entire population, which may not be accurate since market saturation, economic factors, and regional differences will affect adoption rates. 
+
+
+#Reference: 
+
+Nokia. (March 2, 2023). Nokia net sales worldwide from 1999 to 2022 (in billion euros) [Graph]. In Statista. Retrieved Feb22, 2024, from https://www.statista.com/statistics/267819/nokias-net-sales-since-1999/
+Nokia sales data source:
+
+
+
+
+
